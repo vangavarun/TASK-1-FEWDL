@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Student Management System (Single File)</title>
+  <!-- CDN libraries for PDF/Excel generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+  <style>
+    :root{--bg:#f6f8fb;--card:#fff;--accent:#3b82f6;--muted:#6b7280}
+    *{box-sizing:border-box}
+    body{font-family:Inter,system-ui,Segoe UI,Arial; margin:0; background:var(--bg); color:#111}
+    .container{max-width:1100px;margin:28px auto;padding:20px}
+    .card{background:var(--card);border-radius:10px;box-shadow:0 6px 18px rgba(12,18,31,0.06);padding:18px}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+    h1{font-size:20px;margin:0}
+    .muted{color:var(--muted);font-size:13px}
+    .row{display:flex;gap:12px;align-items:center}
+    input,select,button,textarea{font-family:inherit}
+    input[type=text],select{padding:8px 10px;border:1px solid #e6e9ee;border-radius:8px}
+    table{width:100%;border-collapse:collapse;margin-top:14px}
+    th,td{padding:10px;border-bottom:1px solid #f1f3f6;text-align:left;font-size:14px}
+    th{background:#fbfdff}
+    .btn{background:var(--accent);color:#fff;padding:8px 12px;border-radius:8px;border:none;cursor:pointer}
+    .btn.ghost{background:transparent;color:var(--accent);border:1px solid rgba(59,130,246,0.12)}
+    .btn.warn{background:#ef4444}
+    .filters{display:flex;gap:8px;align-items:center}
+    .actions{display:flex;gap:8px}
+    .center{text-align:center}
+    /* modal */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(2,6,23,0.45);display:none;align-items:center;justify-content:center}
+    .modal{width:520px;max-width:95%;background:var(--card);padding:16px;border-radius:10px}
+    label{display:block;margin-top:8px;font-size:13px;color:var(--muted)}
+    .small{font-size:13px;color:var(--muted)}
+    .role-badge{padding:6px 8px;border-radius:6px;border:1px solid #e6eefc;background:#eef6ff;color:#064e9c}
+    .inline{display:inline-flex;align-items:center;gap:8px}
+    .table-actions button{margin-right:6px}
+    .hidden{display:none}
+    footer{margin-top:18px;color:var(--muted);font-size:13px}
+    @media (max-width:640px){header{flex-direction:column;align-items:flex-start;gap:10px}}  
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="authView" class="card">
+      <header>
+        <div>
+          <h1>Student Management System</h1>
+          <div class="muted">Single-file demo (HTML/CSS/JS) • Uses localStorage</div>
+        </div>
+        <div class="inline">
+          <div class="small">Demo accounts:</div>
+          <div class="role-badge">admin / admin</div>
+          <div class="role-badge">teacher / teacher</div>
+          <div class="role-badge">student / student</div>
+        </div>
+      </header>
+
+      <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
+        <div style="min-width:220px">
+          <label class="small">Username</label>
+          <input id="loginUser" type="text" value="admin" />
+        </div>
+        <div style="min-width:160px">
+          <label class="small">Password</label>
+          <input id="loginPass" type="text" value="admin" />
+        </div>
+        <div style="margin-left:auto" class="row">
+          <button id="btnLogin" class="btn">Login</button>
+          <button id="btnSeed" class="btn ghost">Seed sample data</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="appView" class="card hidden">
+      <header>
+        <div>
+          <h1 id="appTitle">SMS Dashboard</h1>
+          <div id="loggedAs" class="muted">Logged in as <span id="userInfo"></span></div>
+        </div>
+        <div class="actions">
+          <button id="btnAdd" class="btn">+ Add Student</button>
+          <button id="btnExportPdf" class="btn ghost">Export PDF</button>
+          <button id="btnExportXls" class="btn ghost">Export Excel</button>
+          <button id="btnLogout" class="btn warn">Logout</button>
+        </div>
+      </header>
+
+      <div style="display:flex;gap:12px;align-items:center;margin-top:8px">
+        <input id="searchInput" type="text" placeholder="Search name, id, email..." style="flex:1" />
+        <select id="filterClass">
+          <option value="">All Class</option>
+        </select>
+        <select id="filterGender">
+          <option value="">All Gender</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+        </select>
+      </div>
+
+      <table id="studentsTable" aria-label="students table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Class</th>
+            <th>Gender</th>
+            <th>Email</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <footer>This demo stores data in your browser localStorage (key: <code>sms_students</code>).</footer>
+    </div>
+  </div>
+
+  <!-- Modal: Add/Edit Student -->
+  <div id="modal" class="modal-backdrop">
+    <div class="modal card">
+      <h3 id="modalTitle">Add Student</h3>
+      <form id="studentForm">
+        <input type="hidden" id="stu_index" />
+        <label>Student ID</label>
+        <input id="stu_id" type="text" required />
+        <label>Full Name</label>
+        <input id="stu_name" type="text" required />
+        <label>Class / Grade</label>
+        <input id="stu_class" type="text" placeholder="e.g. 10A" />
+        <label>Gender</label>
+        <select id="stu_gender">
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+          <option value="Other">Other</option>
+        </select>
+        <label>Email</label>
+        <input id="stu_email" type="text" />
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+          <button type="button" id="btnCancel" class="btn ghost">Cancel</button>
+          <button type="submit" class="btn">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // ---------- Simple role-based demo users ----------
+    const demoUsers = [
+      {username:'admin', password:'admin', role:'admin', name:'Administrator'},
+      {username:'teacher', password:'teacher', role:'teacher', name:'Teacher Jane'},
+      {username:'student', password:'student', role:'student', name:'Student Bob'}
+    ];
+
+    // ---------- LocalStorage helpers ----------
+    const STORAGE_KEY = 'sms_students';
+    function loadStudents(){
+      try{ return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]') }catch(e){return[]}
+    }
+    function saveStudents(list){ localStorage.setItem(STORAGE_KEY, JSON.stringify(list)) }
+
+    // ---------- UI elements ----------
+    const authView = document.getElementById('authView');
+    const appView = document.getElementById('appView');
+    const loginUser = document.getElementById('loginUser');
+    const loginPass = document.getElementById('loginPass');
+    const btnLogin = document.getElementById('btnLogin');
+    const btnSeed = document.getElementById('btnSeed');
+    const btnLogout = document.getElementById('btnLogout');
+    const userInfo = document.getElementById('userInfo');
+    const appTitle = document.getElementById('appTitle');
+    const btnAdd = document.getElementById('btnAdd');
+    const studentsTbody = document.querySelector('#studentsTable tbody');
+    const modal = document.getElementById('modal');
+    const modalTitle = document.getElementById('modalTitle');
+    const studentForm = document.getElementById('studentForm');
+    const btnCancel = document.getElementById('btnCancel');
+    const searchInput = document.getElementById('searchInput');
+    const filterClass = document.getElementById('filterClass');
+    const filterGender = document.getElementById('filterGender');
+    const btnExportPdf = document.getElementById('btnExportPdf');
+    const btnExportXls = document.getElementById('btnExportXls');
+
+    let currentUser = null;
+    let students = loadStudents();
+
+    // ---------- Seed sample data ----------
+    btnSeed.addEventListener('click', ()=>{
+      const sample = [
+        {id:'S1001',name:'Alice Johnson',class:'10A',gender:'Female',email:'alice@example.com'},
+        {id:'S1002',name:'Rahul Kumar',class:'10A',gender:'Male',email:'rahul@example.com'},
+        {id:'S1003',name:'Maya Singh',class:'9B',gender:'Female',email:'maya@example.com'},
+      ];
+      students = sample; saveStudents(students); renderTable(); populateClassFilter();
+      alert('Seeded sample data');
+    })
+
+    // ---------- Authentication (simple demo) ----------
+    btnLogin.addEventListener('click', ()=>{
+      const u = loginUser.value.trim();
+      const p = loginPass.value.trim();
+      const found = demoUsers.find(x=>x.username===u && x.password===p);
+      if(!found){ alert('Invalid credentials. Try admin/admin, teacher/teacher, student/student'); return }
+      currentUser = found; showApp();
+    })
+    btnLogout.addEventListener('click', ()=>{ currentUser=null; appView.classList.add('hidden'); authView.classList.remove('hidden'); })
+
+    function showApp(){
+      authView.classList.add('hidden'); appView.classList.remove('hidden');
+      userInfo.textContent = `${currentUser.name} (${currentUser.role})`;
+      appTitle.textContent = `SMS Dashboard — ${currentUser.role.toUpperCase()}`;
+      // Role-specific controls
+      if(currentUser.role==='student'){
+        btnAdd.disabled = true; btnAdd.classList.add('ghost'); btnExportPdf.disabled = true; btnExportXls.disabled = true;
+      } else if(currentUser.role==='teacher'){
+        btnAdd.disabled=false; btnExportPdf.disabled=false; btnExportXls.disabled=false;
+      } else { // admin
+        btnAdd.disabled=false; btnExportPdf.disabled=false; btnExportXls.disabled=false;
+      }
+      renderTable(); populateClassFilter();
+    }
+
+    // ---------- Table rendering, search & filters ----------
+    function renderTable(){
+      students = loadStudents();
+      const q = searchInput.value.trim().toLowerCase();
+      const cls = filterClass.value;
+      const gender = filterGender.value;
+      studentsTbody.innerHTML = '';
+      const filtered = students.filter((s)=>{
+        if(cls && s.class!==cls) return false;
+        if(gender && s.gender!==gender) return false;
+        if(!q) return true;
+        return [s.id,s.name,s.email,s.class].join(' ').toLowerCase().includes(q);
+      });
+      filtered.forEach((s,i)=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${i+1}</td>
+          <td>${s.id}</td>
+          <td>${s.name}</td>
+          <td>${s.class||''}</td>
+          <td>${s.gender||''}</td>
+          <td>${s.email||''}</td>
+          <td class="table-actions">
+            <button class="btn ghost" data-action="view" data-index="${i}">View</button>
+            ${currentUser.role!=='student' ? `<button class="btn" data-action="edit" data-index="${i}">Edit</button>` : ''}
+            ${currentUser.role==='admin' ? `<button class="btn warn" data-action="delete" data-index="${i}">Delete</button>` : ''}
+          </td>`;
+        studentsTbody.appendChild(tr);
+      });
+    }
+    searchInput.addEventListener('input', renderTable);
+    filterClass.addEventListener('change', renderTable);
+    filterGender.addEventListener('change', renderTable);
+
+    function populateClassFilter(){
+      const classes = Array.from(new Set((students||[]).map(s=>s.class).filter(Boolean)));
+      filterClass.innerHTML = '<option value="">All Class</option>' + classes.map(c=>`<option value="${c}">${c}</option>`).join('');
+    }
+
+    // ---------- Add/Edit modal ----------
+    btnAdd.addEventListener('click', ()=>openModal('add'));
+    btnCancel.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e)=>{ if(e.target===modal) closeModal() });
+
+    function openModal(mode, index=null){
+      modalTitle.textContent = mode==='add' ? 'Add Student' : 'Edit Student';
+      document.getElementById('stu_index').value = index==null? '': index;
+      if(mode==='edit' && index!==null){
+        const s = students[index]; document.getElementById('stu_id').value = s.id; document.getElementById('stu_name').value = s.name;
+        document.getElementById('stu_class').value = s.class||''; document.getElementById('stu_gender').value = s.gender||'Male'; document.getElementById('stu_email').value = s.email||'';
+      } else {
+        document.getElementById('stu_id').value = '';
+        document.getElementById('stu_name').value = '';
+        document.getElementById('stu_class').value = '';
+        document.getElementById('stu_gender').value = 'Male';
+        document.getElementById('stu_email').value = '';
+      }
+      modal.style.display = 'flex'; modal.classList.remove('hidden'); modal.style.display = 'flex';
+    }
+    function closeModal(){ modal.style.display='none'; }
+
+    studentForm.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const idx = document.getElementById('stu_index').value;
+      const newRec = { id:document.getElementById('stu_id').value.trim(), name:document.getElementById('stu_name').value.trim(), class:document.getElementById('stu_class').value.trim(), gender:document.getElementById('stu_gender').value, email:document.getElementById('stu_email').value.trim() };
+      if(!newRec.id || !newRec.name){ alert('ID and Name required'); return }
+      if(idx===''){
+        // add
+        students.push(newRec);
+      } else {
+        students[Number(idx)] = newRec;
+      }
+      saveStudents(students); renderTable(); populateClassFilter(); closeModal();
+    })
+
+    // ---------- Table action delegation ----------
+    studentsTbody.addEventListener('click', (e)=>{
+      const btn = e.target.closest('button'); if(!btn) return;
+      const action = btn.dataset.action; const idx = Number(btn.dataset.index);
+      if(action==='view'){
+        const s = students[idx]; alert(`ID: ${s.id}\nName: ${s.name}\nClass: ${s.class}\nGender: ${s.gender}\nEmail: ${s.email}`)
+      } else if(action==='edit'){
+        openModal('edit', idx);
+      } else if(action==='delete'){
+        if(confirm('Delete this student?')){ students.splice(idx,1); saveStudents(students); renderTable(); populateClassFilter(); }
+      }
+    })
+
+    // ---------- Export PDF & Excel ----------
+    btnExportPdf.addEventListener('click', async ()=>{
+      if(typeof window.jspdf === 'undefined' && typeof window.jspdf === 'undefined'){
+        // try the UMD var
+      }
+      const { jsPDF } = window.jspdf || window.jspdf || window.jspdf.umd || {};
+      if(!jsPDF){ alert('jsPDF not loaded yet — try again in a moment'); return }
+      const doc = new jsPDF({unit:'pt',format:'a4'});
+      const rows = (students||[]).map((s,i)=>[i+1,s.id,s.name,s.class||'',s.gender||'',s.email||'']);
+      const header = ['#','ID','Name','Class','Gender','Email'];
+      // Simple table rendering
+      doc.setFontSize(12); doc.text('Student Report', 40, 40);
+      let y = 70; const lineHeight = 18;
+      doc.setFontSize(10);
+      doc.text(header.join('    '), 40, y); y += lineHeight;
+      rows.forEach(r=>{ doc.text(r.join('    '), 40, y); y += lineHeight; if(y>750){ doc.addPage(); y=40 } });
+      doc.save('students-report.pdf');
+    })
+
+    btnExportXls.addEventListener('click', ()=>{
+      if(typeof XLSX === 'undefined'){ alert('SheetJS (XLSX) not loaded yet — try again'); return }
+      const ws = XLSX.utils.json_to_sheet(students.map((s,i)=>({No:i+1,ID:s.id,Name:s.name,Class:s.class||'',Gender:s.gender||'',Email:s.email||''})));
+      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Students');
+      XLSX.writeFile(wb, 'students.xlsx');
+    })
+
+    // Initialize page state
+    (function init(){
+      students = loadStudents();
+      populateClassFilter();
+      // If no students exist, leave auth displayed. Optionally auto-seed.
+    })();
+
+    // Expose a quick keyboard: Ctrl+Shift+S to seed data
+    window.addEventListener('keydown', (e)=>{ if(e.ctrlKey && e.shiftKey && e.key.toLowerCase()==='s'){ btnSeed.click() } });
+  </script>
+</body>
+</html>
