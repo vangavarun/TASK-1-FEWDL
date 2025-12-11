@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>LifeCanvas — Personal Productivity Dashboard</title>
+  <style>
+    :root{
+      --bg:#0f1724; --card:#0b1220; --muted:#9aa7bf; --accent:#7c3aed; --glass: rgba(255,255,255,0.04);
+      --glass-2: rgba(255,255,255,0.03);
+      --radius:14px; --gap:16px; --max:1100px;
+      font-synthesis: none;
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;color:#e6eef8;background:linear-gradient(180deg,var(--bg),#071028);}
+    .app{max-width:var(--max);margin:28px auto;padding:20px;display:grid;grid-template-columns:320px 1fr;gap:var(--gap);}
+
+    /* Sidebar */
+    .sidebar{background:linear-gradient(180deg,var(--card), rgba(10,14,20,0.6));padding:18px;border-radius:var(--radius);backdrop-filter: blur(6px);min-height:420px}
+    .brand{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+    .logo{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#2dd4bf);display:grid;place-items:center;font-weight:700;color:#04111a}
+    h1{font-size:18px;margin:0}
+    p.muted{color:var(--muted);margin:6px 0 12px;font-size:13px}
+    .small{font-size:13px;color:var(--muted)}
+
+    .card{background:linear-gradient(180deg,var(--glass),var(--glass-2));padding:14px;border-radius:12px;margin-bottom:12px}
+
+    /* Main */
+    .main{display:flex;flex-direction:column;gap:var(--gap)}
+    .top{display:flex;justify-content:space-between;gap:12px;align-items:center}
+    .search{flex:1;background:transparent;border:1px solid rgba(255,255,255,0.04);padding:10px;border-radius:10px;color:var(--muted)}
+
+    /* Grid sections */
+    .grid{display:grid;grid-template-columns:1fr 360px;gap:var(--gap);align-items:start}
+
+    /* Tasks */
+    .tasks .add{display:flex;gap:8px;margin-bottom:10px}
+    input.text, textarea.text{flex:1;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+    button.btn{background:var(--accent);border:none;color:#fff;padding:10px 12px;border-radius:10px;cursor:pointer}
+    ul.tasks-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
+    li.task{display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);background:rgba(255,255,255,0.01)}
+    li.task .meta{flex:1}
+    li.task.completed{opacity:0.6;text-decoration:line-through}
+    .task-actions{display:flex;gap:8px}
+    .chip{font-size:12px;padding:6px 8px;border-radius:999px;border:1px solid rgba(255,255,255,0.03)}
+
+    /* Goals */
+    .goal{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.03)}
+    .progress{height:10px;background:rgba(255,255,255,0.03);border-radius:999px;overflow:hidden}
+    .progress > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#06b6d4);width:0}
+
+    /* Quotes */
+    .quote{font-style:italic;color:#dbeafe}
+    .quote-author{font-weight:600;color:var(--muted);font-size:13px}
+
+    /* Responsive */
+    @media (max-width:900px){.app{grid-template-columns:1fr;}.grid{grid-template-columns:1fr}}
+
+    footer{color:var(--muted);font-size:13px;text-align:center;margin-top:8px}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar card">
+      <div class="brand">
+        <div class="logo">LC</div>
+        <div>
+          <h1>LifeCanvas</h1>
+          <div class="small">Personal • Productivity • Dynamic</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:12px;color:var(--muted)">Today</div>
+            <div id="today" style="font-weight:700;margin-top:4px">—</div>
+          </div>
+          <div style="text-align:right">
+            <div class="small">Streak</div>
+            <div class="chip" id="streak">0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div class="small">Quick Stats</div>
+          <div class="small">Progress</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div style="flex:1">
+            <div class="small">Tasks</div>
+            <div id="stat-tasks" style="font-weight:700">0</div>
+          </div>
+          <div style="flex:1">
+            <div class="small">Goals</div>
+            <div id="stat-goals" style="font-weight:700">0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="small" style="margin-bottom:8px">Motivation</div>
+        <div id="quoteBox">
+          <div class="quote" id="quoteText">"Keep going — small steps compound."</div>
+          <div class="quote-author" id="quoteAuthor">— Unknown</div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn" id="nextQuote">Next</button>
+          <button class="btn" id="surprise">Surprise</button>
+        </div>
+      </div>
+
+      <div style="margin-top:12px;font-size:12px;color:var(--muted)">Tip: This dashboard saves data locally in your browser (localStorage).</div>
+    </aside>
+
+    <main class="main">
+      <div class="top">
+        <input class="search" placeholder="Search tasks or goals..." id="globalSearch">
+        <div style="display:flex;gap:8px;align-items:center">
+          <div class="small" id="clock">--:--</div>
+        </div>
+      </div>
+
+      <div class="grid">
+        <section>
+          <div class="card tasks">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+              <div style="font-weight:700">Tasks</div>
+              <div class="small">Manage your daily to-dos</div>
+            </div>
+
+            <div class="add">
+              <input class="text" id="taskInput" placeholder="Add a new task...">
+              <button class="btn" id="addTaskBtn">Add</button>
+            </div>
+
+            <ul class="tasks-list" id="tasksList"></ul>
+
+            <div style="margin-top:12px;display:flex;gap:8px">
+              <button class="btn" id="clearCompleted">Clear Completed</button>
+              <button class="btn" id="export">Export JSON</button>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <div style="font-weight:700">Goals</div>
+              <div class="small">Track progress</div>
+            </div>
+            <div style="display:flex;gap:8px;margin-bottom:8px">
+              <input class="text" id="goalTitle" placeholder="New goal title">
+              <button class="btn" id="addGoalBtn">Add Goal</button>
+            </div>
+            <div id="goalsContainer"></div>
+          </div>
+        </section>
+
+        <aside>
+          <div class="card">
+            <div style="font-weight:700;margin-bottom:8px">Focus</div>
+            <div class="small">Start a quick focus timer</div>
+            <div style="display:flex;gap:8px;margin-top:10px">
+              <input id="minutes" type="number" class="text" style="width:90px" value="25">
+              <button class="btn" id="startTimer">Start</button>
+            </div>
+            <div style="margin-top:10px" id="timerDisplay">25:00</div>
+          </div>
+
+          <div class="card" style="margin-top:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <div style="font-weight:700">Inspiration</div>
+              <div class="small">Rotate quotes</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <button class="btn" id="addQuote">Add Quote</button>
+              <button class="btn" id="manageData">Reset Data</button>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <footer>Made with ♥ — LifeCanvas</footer>
+    </main>
+  </div>
+
+  <script>
+    /*********************
+      Simple single-file LifeCanvas dashboard
+      Features:
+        - Tasks (add/complete/delete) with localStorage
+        - Goals with progress bars
+        - Rotating motivational quotes
+        - Simple focus timer
+        - Local export/reset
+    *********************/
+
+    // ---- Data layer ----
+    const STORAGE_KEY = 'lifecanvas_v1';
+    let state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    if (!state.tasks) state.tasks = [];
+    if (!state.goals) state.goals = [];
+    if (!state.quotes) state.quotes = [
+      {text: 'Don\'t count the days — make the days count.', author: 'Muhammad Ali'},
+      {text: 'Small steps every day.', author: '— LifeCanvas'},
+      {text: 'Action is the foundational key to all success.', author: 'Pablo Picasso'}
+    ];
+    if (state.streak == null) state.streak = 0;
+
+    function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); render(); }
+
+    // ---- Utilities ----
+    function qs(sel){return document.querySelector(sel)}
+    function qsa(sel){return document.querySelectorAll(sel)}
+
+    // ---- UI elements ----
+    const tasksList = qs('#tasksList');
+    const taskInput = qs('#taskInput');
+    const addTaskBtn = qs('#addTaskBtn');
+    const statTasks = qs('#stat-tasks');
+    const statGoals = qs('#stat-goals');
+    const goalsContainer = qs('#goalsContainer');
+    const addGoalBtn = qs('#addGoalBtn');
+    const goalTitle = qs('#goalTitle');
+    const quoteText = qs('#quoteText');
+    const quoteAuthor = qs('#quoteAuthor');
+    const nextQuote = qs('#nextQuote');
+    const surprise = qs('#surprise');
+    const todayEl = qs('#today');
+    const clockEl = qs('#clock');
+    const streakEl = qs('#streak');
+
+    function uid(){return Math.random().toString(36).slice(2,9)}
+
+    // ---- Render ----
+    function render(){
+      // tasks
+      tasksList.innerHTML = '';
+      state.tasks.forEach(t => {
+        const li = document.createElement('li'); li.className='task'+(t.done? ' completed':'');
+        li.innerHTML = `
+          <input type="checkbox" ${t.done? 'checked':''} data-id="${t.id}">
+          <div class="meta">
+            <div style="font-weight:600">${escapeHtml(t.title)}</div>
+            <div class="small">${t.note? escapeHtml(t.note): ''}</div>
+          </div>
+          <div class="task-actions">
+            <div class="chip">${t.createdAt ? new Date(t.createdAt).toLocaleDateString():''}</div>
+            <button class="btn" data-action="del" data-id="${t.id}">Del</button>
+          </div>`;
+        tasksList.appendChild(li);
+      });
+
+      // stats
+      statTasks.textContent = state.tasks.length;
+      statGoals.textContent = state.goals.length;
+      streakEl.textContent = state.streak;
+
+      // goals
+      goalsContainer.innerHTML = '';
+      state.goals.forEach(g => {
+        const div = document.createElement('div'); div.className='goal';
+        div.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="font-weight:600">${escapeHtml(g.title)}</div>
+            <div class="small">${g.progress}%</div>
+          </div>
+          <div class="progress"><i style="width:${Math.max(0,Math.min(100,g.progress))}%"></i></div>
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <button class="btn" data-action="inc" data-id="${g.id}">+10%</button>
+            <button class="btn" data-action="dec" data-id="${g.id}">-10%</button>
+            <button class="btn" data-action="delg" data-id="${g.id}">Remove</button>
+          </div>`;
+        goalsContainer.appendChild(div);
+      });
+
+      // quote
+      const idx = state._quoteIndex || 0;
+      const q = state.quotes[idx % state.quotes.length];
+      quoteText.textContent = `"${q.text}"`;
+      quoteAuthor.textContent = `— ${q.author || 'Unknown'}`;
+
+      // date/time
+      todayEl.textContent = new Date().toLocaleDateString(undefined, {weekday:'short',month:'short',day:'numeric'});
+    }
+
+    // ---- Events ----
+    addTaskBtn.onclick = ()=>{
+      const v = taskInput.value.trim(); if(!v) return; 
+      state.tasks.unshift({id:uid(),title:v,done:false,createdAt:Date.now()}); taskInput.value=''; save();
+    }
+
+    tasksList.onclick = (e)=>{
+      const id = e.target.dataset.id;
+      if(!id) return;
+      if(e.target.tagName === 'INPUT'){
+        const t = state.tasks.find(x=>x.id===id); if(t){t.done = e.target.checked; save();}
+      }
+      if(e.target.dataset.action === 'del'){
+        state.tasks = state.tasks.filter(x=>x.id!==id); save();
+      }
+    }
+
+    qs('#clearCompleted').onclick = ()=>{ state.tasks = state.tasks.filter(t=>!t.done); save(); }
+    qs('#export').onclick = ()=>{ const blob = new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='lifecanvas-export.json'; a.click(); URL.revokeObjectURL(url); }
+
+    addGoalBtn.onclick = ()=>{
+      const t = goalTitle.value.trim(); if(!t) return; state.goals.push({id:uid(),title:t,progress:0}); goalTitle.value=''; save();
+    }
+
+    goalsContainer.onclick = (e)=>{
+      const id = e.target.dataset.id; if(!id) return;
+      const g = state.goals.find(x=>x.id===id); if(!g) return;
+      if(e.target.dataset.action === 'inc'){ g.progress = Math.min(100,g.progress+10); save(); }
+      if(e.target.dataset.action === 'dec'){ g.progress = Math.max(0,g.progress-10); save(); }
+      if(e.target.dataset.action === 'delg'){ state.goals = state.goals.filter(x=>x.id!==id); save(); }
+    }
+
+    // Quotes
+    nextQuote.onclick = ()=>{ state._quoteIndex = ((state._quoteIndex||0) + 1) % state.quotes.length; save(); }
+    surprise.onclick = ()=>{ state._quoteIndex = Math.floor(Math.random()*state.quotes.length); save(); }
+    qs('#addQuote').onclick = ()=>{
+      const txt = prompt('Enter a short inspirational quote (text - author)');
+      if(!txt) return; const parts = txt.split(' - '); state.quotes.push({text:parts[0].trim(), author: (parts[1]||'Unknown').trim()}); save();
+    }
+
+    // Manage data
+    qs('#manageData').onclick = ()=>{
+      if(confirm('Reset all LifeCanvas data? This will clear tasks, goals and quotes.')){
+        localStorage.removeItem(STORAGE_KEY); location.reload();
+      }
+    }
+
+    // Focus timer
+    let timerInterval = null;
+    qs('#startTimer').onclick = ()=>{
+      const m = Number(qs('#minutes').value) || 25; let seconds = Math.floor(m*60);
+      clearInterval(timerInterval);
+      qs('#timerDisplay').textContent = formatTime(seconds);
+      timerInterval = setInterval(()=>{
+        seconds--; qs('#timerDisplay').textContent = formatTime(seconds);
+        if(seconds<=0){ clearInterval(timerInterval); alert('Timer finished — good focus!'); }
+      },1000);
+    }
+    function formatTime(s){ const mm = Math.floor(s/60).toString().padStart(2,'0'); const ss = (s%60).toString().padStart(2,'0'); return `${mm}:${ss}` }
+
+    // Clock
+    setInterval(()=>{ const now = new Date(); clockEl.textContent = now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); },1000);
+
+    // Simple search
+    qs('#globalSearch').addEventListener('input', (e)=>{
+      const q = e.target.value.toLowerCase(); document.querySelectorAll('#tasksList .task').forEach((el,i)=>{
+        const text = el.querySelector('.meta').innerText.toLowerCase(); el.style.display = text.includes(q)?'flex':'none';
+      });
+    });
+
+    // helpers
+    function escapeHtml(s){ return s.replace(/[&<>\"']/g, (c)=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+
+    // initial render
+    render();
+
+    // save periodically (guard against accidental data loss)
+    setInterval(()=>localStorage.setItem(STORAGE_KEY, JSON.stringify(state)), 5000);
+  </script>
+</body>
+</html>
