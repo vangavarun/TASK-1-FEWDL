@@ -1,0 +1,319 @@
+<!--
+WellTrack — Health Daily: Single-file HTML/CSS/JS
+Features:
+- Add / remove habits
+- Mark daily completion with checkboxes
+- Progress bar and completion %
+- Streak tracking (consecutive days)
+- Quick inputs: water, sleep, mood, notes
+- Persistent storage via localStorage
+- Simple, clean UI for easy customization
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WellTrack — Daily Wellness & Habit Tracker</title>
+  <style>
+    :root{--bg:#0f1724;--card:#0b1220;--accent:#6ee7b7;--muted:#94a3b8;--glass:rgba(255,255,255,0.03)}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial;background:linear-gradient(180deg,#071024 0%, #071829 100%);color:#e6eef6;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:28px}
+    .app{width:100%;max-width:960px}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+    h1{font-size:20px;margin:0}
+    .sub{color:var(--muted);font-size:13px}
+
+    .layout{display:grid;grid-template-columns:1fr 360px;gap:18px}
+    .card{background:var(--card);border-radius:14px;padding:16px;box-shadow:0 6px 20px rgba(2,6,23,0.6);backdrop-filter:blur(6px)}
+
+    /* Habit list */
+    .habits-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .habits{display:flex;flex-direction:column;gap:8px}
+    .habit{display:flex;align-items:center;gap:12px;padding:10px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent)}
+    .habit input[type=checkbox]{width:20px;height:20px}
+    .habit .title{flex:1}
+    .controls{display:flex;gap:8px}
+    .btn{background:var(--glass);border:1px solid rgba(255,255,255,0.04);padding:8px 10px;border-radius:10px;color:var(--muted);cursor:pointer;font-size:13px}
+    .btn.primary{background:linear-gradient(90deg,var(--accent),#34d399);color:#062018;border:none}
+
+    /* progress */
+    .progress-wrap{margin:12px 0}
+    .progress{height:12px;background:rgba(255,255,255,0.04);border-radius:999px;overflow:hidden}
+    .progress > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#60a5fa);width:0%}
+    .small{font-size:13px;color:var(--muted)}
+
+    /* Quick stats */
+    .stat{display:flex;align-items:center;justify-content:space-between;padding:10px;border-radius:10px;background:rgba(255,255,255,0.02)}
+    .stat input[type=range]{width:100%}
+    .quick{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+    /* add form */
+    .add{display:flex;gap:8px;margin-top:8px}
+    .add input{flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+
+    footer{margin-top:12px;display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:13px}
+
+    /* responsive */
+    @media (max-width:880px){.layout{grid-template-columns:1fr}.card{padding:14px}.app{padding:10px}}
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div>
+        <h1>WellTrack — Daily Wellness</h1>
+        <div class="sub">Track habits, water, sleep & mood — stay consistent</div>
+      </div>
+      <div class="sub" id="date">Date</div>
+    </header>
+
+    <section class="layout">
+      <section class="card">
+        <div class="habits-header">
+          <div>
+            <strong>Today's Habits</strong>
+            <div class="small">Mark what you completed today</div>
+          </div>
+          <div class="controls">
+            <button class="btn" id="resetDay">Reset Day</button>
+            <button class="btn primary" id="addSample">Add Sample</button>
+          </div>
+        </div>
+
+        <div class="progress-wrap">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div class="small" id="progressText">0 / 0 completed</div>
+            <div class="small" id="percent">0%</div>
+          </div>
+          <div class="progress"><i id="progressBar"></i></div>
+        </div>
+
+        <div class="habits" id="habitsList"></div>
+
+        <div class="add">
+          <input id="newHabit" placeholder="Add a new habit (e.g. 10 min meditation)" />
+          <button class="btn primary" id="addBtn">Add</button>
+        </div>
+
+        <footer>
+          <div class="small">Streak: <strong id="streak">0</strong> days</div>
+          <div class="small">Last saved: <span id="savedAt">never</span></div>
+        </footer>
+      </section>
+
+      <aside class="card">
+        <div style="margin-bottom:12px">
+          <strong>Quick Wellness</strong>
+          <div class="small">Save quick daily metrics</div>
+        </div>
+
+        <div class="quick" style="margin-bottom:10px">
+          <div class="stat">
+            <div style="flex:1;margin-right:8px">
+              <div class="small">Water (glasses)</div>
+              <input id="water" type="number" min="0" max="20" value="0" />
+            </div>
+          </div>
+
+          <div class="stat">
+            <div style="flex:1;margin-right:8px">
+              <div class="small">Sleep (hrs)</div>
+              <input id="sleep" type="number" min="0" max="24" step="0.25" value="7" />
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom:10px">
+          <div class="small">Mood</div>
+          <select id="mood" style="width:100%;padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04)">
+            <option value="5">😊 Excellent</option>
+            <option value="4">🙂 Good</option>
+            <option value="3">😐 Okay</option>
+            <option value="2">😕 Low</option>
+            <option value="1">😞 Bad</option>
+          </select>
+        </div>
+
+        <div style="margin-bottom:8px">
+          <div class="small">Notes</div>
+          <textarea id="notes" rows="4" style="width:100%;padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:inherit"></textarea>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn" id="loadToday">Load Today</button>
+          <button class="btn primary" id="save">Save</button>
+        </div>
+
+        <hr style="margin:14px 0;border:none;border-top:1px solid rgba(255,255,255,0.03)" />
+        <div class="small">Tips</div>
+        <ul class="small" style="margin:8px 0 0 16px;color:var(--muted)">
+          <li>Break big goals into small daily habits</li>
+          <li>Celebrate streaks — consistency > perfection</li>
+          <li>Use "Reset Day" if you want a fresh start</li>
+        </ul>
+      </aside>
+    </section>
+
+  </main>
+
+  <script>
+    // Simple WellTrack logic
+    const key = 'welltrack:data';
+    const todayKey = new Date().toISOString().slice(0,10);
+
+    const dateEl = document.getElementById('date');
+    const habitsList = document.getElementById('habitsList');
+    const progressBar = document.getElementById('progressBar');
+    const percent = document.getElementById('percent');
+    const progressText = document.getElementById('progressText');
+    const savedAt = document.getElementById('savedAt');
+    const streakEl = document.getElementById('streak');
+
+    // quick inputs
+    const water = document.getElementById('water');
+    const sleep = document.getElementById('sleep');
+    const mood = document.getElementById('mood');
+    const notes = document.getElementById('notes');
+
+    const newHabit = document.getElementById('newHabit');
+    const addBtn = document.getElementById('addBtn');
+    const addSample = document.getElementById('addSample');
+    const resetDay = document.getElementById('resetDay');
+    const saveBtn = document.getElementById('save');
+    const loadTodayBtn = document.getElementById('loadToday');
+
+    // initialize
+    dateEl.textContent = new Date().toLocaleDateString();
+
+    function loadData(){
+      try{
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : {days:{}, habits:[]};
+      }catch(e){console.error(e);return {days:{}, habits:[]}}
+    }
+
+    function saveData(data){
+      localStorage.setItem(key, JSON.stringify(data));
+      savedAt.textContent = new Date().toLocaleTimeString();
+    }
+
+    function getTodayData(data){
+      if(!data.days) data.days = {};
+      if(!data.days[todayKey]){
+        // default day record
+        data.days[todayKey] = {completed:{}, water:0, sleep:7, mood:4, notes:'', date:todayKey}
+      }
+      return data.days[todayKey];
+    }
+
+    function renderHabits(){
+      const data = loadData();
+      const today = getTodayData(data);
+      habitsList.innerHTML = '';
+      const habits = data.habits;
+      if(habits.length === 0){
+        habitsList.innerHTML = '<div class="small" style="padding:12px">No habits yet — add one below or click \"Add Sample\".</div>';
+      }
+
+      habits.forEach((h,idx) => {
+        const div = document.createElement('div'); div.className = 'habit';
+        const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!today.completed[h.id];
+        cb.addEventListener('change', () => {
+          today.completed[h.id] = cb.checked;
+          data.habits[idx].lastCompleted = cb.checked ? today.date : data.habits[idx].lastCompleted;
+          saveData(data);
+          updateProgress();
+          updateStreaks();
+        });
+
+        const t = document.createElement('div'); t.className = 'title'; t.textContent = h.title;
+        const del = document.createElement('button'); del.className = 'btn'; del.textContent = 'Delete';
+        del.addEventListener('click', () => { if(confirm('Delete habit?')){ data.habits.splice(idx,1); saveData(data); renderHabits(); updateProgress(); updateStreaks(); }});
+
+        div.appendChild(cb); div.appendChild(t); div.appendChild(del);
+        habitsList.appendChild(div);
+      });
+
+      // update quick inputs from today data
+      water.value = today.water || 0; sleep.value = today.sleep || 7; mood.value = today.mood || 4; notes.value = today.notes || '';
+      updateProgress(); updateStreaks();
+    }
+
+    function addHabit(title){
+      if(!title) return;
+      const data = loadData();
+      const id = 'h_' + Math.random().toString(36).slice(2,9);
+      data.habits.push({id, title, created: new Date().toISOString().slice(0,10)});
+      saveData(data); renderHabits();
+    }
+
+    addBtn.addEventListener('click', ()=>{ addHabit(newHabit.value.trim()); newHabit.value = ''; });
+    newHabit.addEventListener('keydown', (e)=>{ if(e.key === 'Enter'){ addHabit(newHabit.value.trim()); newHabit.value=''; }});
+
+    addSample.addEventListener('click', ()=>{
+      const sample = ['Morning stretch','10 min meditation','Drink 8 glasses water','Walk 30 mins','Read 20 minutes'];
+      const data = loadData();
+      sample.forEach(s=>{ data.habits.push({id:'h_'+Math.random().toString(36).slice(2,9), title:s, created: new Date().toISOString().slice(0,10)}); });
+      saveData(data); renderHabits();
+    });
+
+    function updateProgress(){
+      const data = loadData(); const today = getTodayData(data);
+      const total = data.habits.length || 0;
+      const completed = Object.values(today.completed || {}).filter(Boolean).length;
+      const pct = total === 0 ? 0 : Math.round(completed / total * 100);
+      progressBar.style.width = pct + '%'; percent.textContent = pct + '%'; progressText.textContent = `${completed} / ${total} completed`;
+    }
+
+    // Save quick metrics
+    saveBtn.addEventListener('click', ()=>{
+      const data = loadData(); const today = getTodayData(data);
+      today.water = Number(water.value) || 0;
+      today.sleep = Number(sleep.value) || 0;
+      today.mood = Number(mood.value) || 4;
+      today.notes = notes.value || '';
+      saveData(data); renderHabits();
+      alert('Saved for today ✅');
+    });
+
+    loadTodayBtn.addEventListener('click', ()=>{ renderHabits(); alert('Loaded today') });
+
+    resetDay.addEventListener('click', ()=>{
+      if(!confirm('Reset today\'s completions?')) return;
+      const data = loadData(); data.days[todayKey] = {completed:{}, water:0, sleep:7, mood:4, notes:'', date:todayKey};
+      saveData(data); renderHabits();
+    });
+
+    // Streak calculation: count consecutive days where ALL habits were completed
+    function updateStreaks(){
+      const data = loadData(); const habits = data.habits;
+      if(!habits || habits.length === 0){ streakEl.textContent = '0'; return; }
+      // gather dates, sort descending
+      const dayKeys = Object.keys(data.days || {}).sort((a,b)=> b.localeCompare(a));
+      let streak = 0;
+      let expect = new Date();
+      // micro helper to format
+      function fmt(d){ return d.toISOString().slice(0,10); }
+      for(const d of dayKeys){
+        if(d !== fmt(expect)) break; // stop when missing
+        const day = data.days[d];
+        const allDone = habits.every(h => day.completed && day.completed[h.id]);
+        if(allDone){ streak++; expect.setDate(expect.getDate()-1); } else break;
+      }
+      streakEl.textContent = streak;
+    }
+
+    // initialize default structure if missing
+    (function bootstrap(){
+      const data = loadData();
+      if(!data.habits) data.habits = [];
+      saveData(data);
+      renderHabits();
+      // wire quick input changes to auto-save small changes
+      [water,sleep,mood,notes].forEach(el=> el.addEventListener('change', ()=>{ const data = loadData(); const today = getTodayData(data); today[el.id] = el.value; saveData(data); }));
+    })();
+
+  </script>
+</body>
+</html>
